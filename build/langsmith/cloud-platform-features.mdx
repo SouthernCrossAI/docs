@@ -1,0 +1,93 @@
+---
+title: Cloud platform features
+sidebarTitle: Platform features
+icon: "list-check"
+description: Cloud-only platform features for LangSmith Deployment, including data regions, static IP addresses, payload limits, and deployment types.
+---
+
+This page describes the platform features that apply only to [Cloud](/langsmith/cloud) deployments. For self-hosted equivalents, see [Deploy to self-hosted](/langsmith/deploy-to-self-hosted-overview).
+
+## Data region
+
+Deployments can be created in two data regions: US and EU.
+
+The data region for a deployment is implied by the data region of the LangSmith organization where the deployment is created. Deployments and the underlying database for the deployments cannot be migrated between data regions.
+
+## Static IP addresses
+
+All traffic from deployments created after January 6, 2025 comes through a NAT gateway. This NAT gateway has several static IP addresses depending on the data region. For the list of static IP addresses, see the [Allowlist IP addresses table](/langsmith/deploy-to-cloud#allowlist-ip-addresses).
+
+## Payload size
+
+The maximum payload size for all requests sent to Cloud deployments is 25 MB. A request with a payload larger than 25 MB returns a `413 Payload Too Large` error.
+
+## Deployment types
+
+The control plane offers two deployment types: `Serverless` and `Dedicated`. Each is available in three sizes: Small, Medium, and Large.
+
+| **Deployment type** | **Scaling** | **Database** | **Best for** |
+|---|---|---|---|
+| `Serverless` | Scales to zero when idle, wakes on the next request | Shared, multi-tenant | Development, testing, preview branches, and low-volume production |
+| `Dedicated` | Always-on, autoscales across replicas | Dedicated, with automatic backups and high availability | Production workloads in the critical path |
+
+<Warning>
+**Immutable deployment type**
+Once a deployment is created, the deployment type cannot be changed.
+</Warning>
+
+### Serverless
+
+`Serverless` deployments are cost-optimized for development, testing, preview branches, and low-volume production. A `Serverless` deployment scales to zero when idle and wakes on the next request, so you are billed for compute only while it runs. `Serverless` deployments run on shared, multi-tenant infrastructure.
+
+<Note>
+Because a `Serverless` deployment scales to zero when idle, the first request after a period of inactivity can take longer to respond while the deployment starts. For workloads that require consistently low latency or guaranteed uptime, use `Dedicated`.
+</Note>
+
+Agent Server is fault-tolerant: it automatically recovers from transient Redis or Postgres interruptions and retries failed background runs.
+
+### Dedicated
+
+`Dedicated` deployments are always-on and built for production workloads in the critical path, such as customer-facing applications. Each `Dedicated` deployment has its own database with automatic backups and high availability, and autoscales across replicas as load increases. For details, see [Scaling](#scaling).
+
+Resources for `Dedicated` deployments can be increased on a case-by-case basis depending on use case and capacity constraints. Contact support via [support.langchain.com](https://support.langchain.com) to request an increase in resources.
+
+### Sizes
+
+Both `Serverless` and `Dedicated` are available in three sizes: Small, Medium, and Large. Larger sizes provide more compute per replica and a higher maximum number of replicas, so you can match a deployment to its expected load. For the resources included with each size and their cost, see the [pricing page](https://www.langchain.com/pricing).
+
+For how `Serverless` and `Dedicated` deployments are billed, see [Manage billing](/langsmith/billing#langsmith-deployment-billing).
+
+## Database provisioning
+
+The control plane and [data plane](/langsmith/data-plane) listener application coordinate to automatically create a Postgres database for each Cloud deployment. The database serves as the [persistence layer](/oss/python/langgraph/persistence#memory-store) for the deployment.
+
+When implementing a LangGraph application, a [checkpointer](/oss/python/langgraph/persistence#checkpointer-libraries) does not need to be configured. A checkpointer is automatically configured for the graph. Any checkpointer configured for a graph is replaced by the one that is automatically configured.
+
+There is no direct access to the database. All access to the database occurs through the [Agent Server](/langsmith/agent-server).
+
+The database is never deleted until the deployment itself is deleted.
+
+For self-hosted deployments, see [custom PostgreSQL configuration](/langsmith/self-hosted-platform-features#custom-postgresql).
+
+## Scaling
+
+Cloud deployments autoscale automatically; you do not configure queue workers, replicas, or pool sizes directly. `Dedicated` deployments autoscale across replicas based on three metrics:
+
+- **CPU utilization** — autoscaler targets 75%.
+- **Memory utilization** — autoscaler targets 75%.
+- **Pending runs** — autoscaler targets 10 pending runs per container.
+
+Each metric is computed independently and the scaling action follows the metric that requires the largest number of containers. Scale-down actions wait 30 minutes before taking effect to avoid thrashing under bursty load. [Queue workers](/langsmith/agent-server#runtime-architecture) scale on pending run count while [API servers](/langsmith/agent-server#runtime-architecture) scale on CPU and memory, so read traffic does not slow down run submission and vice versa.
+
+Application-level scaling levers (durability modes, async patterns, avoiding synchronous blocking, using `/join` instead of polling) apply to Cloud the same as to self-hosted. See [Scaling on self-hosted](/langsmith/agent-server-scale) for the underlying concepts; the Helm and resource configurations there do not apply to Cloud.
+
+---
+
+<div className="source-links">
+<Callout icon="terminal-2">
+    [Connect these docs](/use-these-docs) to Claude, VSCode, and more via MCP for real-time answers.
+</Callout>
+<Callout icon="edit">
+    [Edit this page on GitHub](https://github.com/langchain-ai/docs/edit/main/src/langsmith/cloud-platform-features.mdx) or [file an issue](https://github.com/langchain-ai/docs/issues/new/choose).
+</Callout>
+</div>
